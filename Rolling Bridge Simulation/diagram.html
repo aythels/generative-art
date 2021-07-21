@@ -1,0 +1,397 @@
+<html>
+  <head>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.1.9/lib/p5.js"></script>
+    <script>
+
+/************************************************
+READ ME READ ME READ ME READ ME READ ME READ ME
+
+The code below has not been refracted.
+A lot of features have been commented out and
+hence are not included in the demo because
+they require additional tinkering to work properly.
+*************************************************/
+	
+let backgroundToggle = false;
+let shouldClear = false;
+const _scale = 1 / 2;
+let init_seg;
+let hide = false;
+
+let automateEnd = false;
+let automateStart = false;
+let drawValue = 0;
+let drawIncre = 0.005;
+
+let shouldColor = true;
+
+let color_background;
+let color_piston_topM;
+let color_piston_topMExtended; 
+let color_seg_botR;
+let color_seg_botL;
+let color_seg_topR;
+let color_seg_topL;
+
+function setup() {
+  createCanvas(windowWidth, windowHeight);
+  
+  //slider = createSlider(0, 0.77, 0, 0.0005);
+  //slider.position(10, 10);
+  //slider.style('width', '400px');
+  
+  //button = createButton('background toggle');
+  //button.position(19, 50);
+  //button.mousePressed(() => backgroundToggle = !backgroundToggle);
+  
+  //button2 = createButton('clear');
+  //button2.position(300, 50);
+  //button2.mousePressed(() => shouldClear = true);
+  
+  //button4 = createButton('hide');
+  //button4.position(400, 50);
+  //button4.mousePressed(() => hide = !hide);
+  
+  button5 = createButton('automate to end');
+  button5.position(500, 50);
+  button5.mousePressed(() => {
+  automateEnd = true;
+  automateStart = false;
+  
+  });
+  
+  //button6 = createButton('automate to start');
+  //button6.position(650, 50);
+  //button6.mousePressed(() => {
+  //automateStart = true;
+  //automateEnd = False;
+  
+  //});
+  
+  color_background = color(33, 33, 33);
+  color_piston_topM = color(0, 188, 255 , 00);
+  color_piston_topMExtended = color(221, 0, 255  , 00);
+  color_seg_botR = color(255, 74, 74   , 00);
+  color_seg_botL =  color(255, 74, 74   , 00);
+  color_seg_topR = color(255, 220, 0    , 00);
+  color_seg_topL =  color(255, 220, 0   , 00);
+  
+  init_seg = new Segment(new _Point(1300, 700), 0);  
+}
+
+function draw() {
+  if (backgroundToggle) background(255 );
+  if (shouldClear) {
+    background(255);
+    shouldClear = false;
+  }
+  
+  if (automateEnd) {
+	if (drawValue <= 0) {
+		background(255 );
+	}
+  
+	automateStart = false;
+	init_seg.rotate(drawValue);
+	drawValue += drawIncre;
+	
+	if (drawValue >= 0.77) {
+		drawValue = 0.77
+		automateEnd = false;
+		shouldColor = false;
+	}
+  }
+  
+   if (automateStart) {
+	automateEnd = false;
+	init_seg.rotate(drawValue);
+	drawValue -= drawIncre;
+	
+	if (drawValue < 0) {
+		drawValue = 0
+		automateStart = false;
+	}
+  }
+  
+  //init_seg.rotate(slider.value());
+  if(!hide) init_seg.draw();
+  
+  _Point.drawLogAll();
+  _Point.updateAll();
+  
+}
+
+const Piston = function (botM, topR, topL) {
+  this.counter = 0;
+
+  this.botM = botM;
+  this.topR = topR;
+  this.topL = topL;
+  this.topM = new _Point();
+  
+  this.topM.color = color_piston_topM;
+  
+  
+  this.topMExtended = new _Point();
+  
+  this.topMExtended.color = color_piston_topMExtended;
+  
+  this.extension = 0;
+  
+  this.update();
+}
+
+Piston.prototype.calExt = function () {
+  const pivot = createVector(this.botM.x, this.botM.y);
+  let v1 = createVector(this.topM.x - pivot.x, this.topM.y - pivot.y);
+  let v2 = createVector(this.topR.x - pivot.x, this.topR.y - pivot.y);
+  
+  //solve for height using SSA triangle calculations
+  const angle = v1.angleBetween(v2);
+  const sideC = dist(
+    this.botM.x, this.botM.y, this.topR.x, this.topR.y);
+  const sideB = 94.3663075467 * _scale;
+  //const angle = 0.541052;
+  //const sideB = 8
+  //const sideC = 13;
+  
+  const sinC = (sideC * sin(angle))/sideB;
+  const angleC = asin(sinC);
+  const angleA = (PI) - angleC - angle;
+  
+  const fuck = (sin(angleA) * sideB)/sin(angle);
+  //console.log(fuck - 182 * _scale);
+
+  return (fuck - (182 * _scale)) * (1.20);
+}
+
+Piston.prototype.rotate = function (radians) {
+  this.update(); 
+  
+  let pivotX = this.botM.x;
+  let pivotY = this.botM.y;
+  
+  this.topM.rotate(radians, pivotX, pivotY);
+  this.topMExtended.rotate(radians, pivotX, pivotY);
+  
+  this.extension = this.calExt();
+  
+  this.update();
+  
+  pivotX = this.botM.x;
+  pivotY = this.botM.y;
+  
+  this.topM.rotate(radians, pivotX, pivotY);
+  this.topMExtended.rotate(radians, pivotX, pivotY);
+  
+}
+  
+Piston.prototype.update = function () {
+  const height = 162 * _scale;
+  
+  this.topM.x = this.botM.x;
+  this.topM.y = this.botM.y - height;
+  
+  this.topMExtended.x = this.topM.x;
+  this.topMExtended.y = this.topM.y - this.extension;
+  
+}
+
+Piston.prototype.draw = function () {  
+  if (!shouldColor ) return;
+
+  if (drawValue > 0 && shouldColor) this.counter++;
+
+  //if ((this.counter - 1) % 14 == 0 || this.counter == 1) {
+
+	  strokeWeight(1);
+	  stroke(0, 0, 255, 150);
+	  line(this.topM.x, this.topM.y, this.topMExtended.x, this.topMExtended.y);
+		   
+	  //stroke(255, 255, 255, 70);
+	  //line(this.botM.x, this.botM.y,      this.topM.x, this.topM.y);
+		   
+		  
+	  //stroke(255, 255, 255, 255);
+	  //line(this.topMExtended.x, this.topMExtended.y, this.topR.x, this.topR.y);
+	  //line(this.topMExtended.x, this.topMExtended.y, this.topL.x, this.topL.y);
+	  
+	  //strokeWeight(8);
+	  //stroke(255, 204, 0);
+	  //point(this.topM.x, this.topM.y);
+	  //stroke(255);
+	  //point(this.topMExtended.x, this.topMExtended.y);
+	  
+	  //console.log(dist (this.topMExtended.x, this.topMExtended.y, 
+	  //this.topL.x, this.topL.y));
+
+	//}
+  
+}
+  
+
+const Segment = function (botR, index) {  
+
+  this.counter = 0;
+
+
+
+  this.botR = botR;
+  this.botR.color = color_seg_botR;
+  
+  
+  this.botL = new _Point();
+  this.botL.color = color_seg_botL;
+  
+  
+  this.topR = new _Point();
+  this.topR.color = color_seg_topR;
+    
+  this.topL = new _Point();
+  this.topL.color = color_seg_topL;
+  
+  this.update();
+  
+  this.index = index;
+  this.link = null;
+  
+  if (this.index < 7 && this.index != null)
+    this.link = new Segment(this.botL, this.index + 1);
+  
+  if (this.index != 7)
+    this.piston = new Piston(this.botL, this.topL, this.link.topR);
+    
+}
+
+Segment.prototype.update = function () {
+  const botWidth = 236 * _scale;
+  const topWidth = 50 * _scale;
+  const height = 166 * _scale;
+  
+  this.botL.x =  this.botR.x - botWidth;
+  this.botL.y = this.botR.y;
+    
+  this.topR.x = this.botR.x - (botWidth - topWidth) / 2;
+  this.topR.y = this.botR.y - height;
+    
+  this.topL.x = this.topR.x - topWidth;
+  this.topL.y = this.topR.y;
+}
+
+Segment.prototype.rotate = function (radians, accumulator) {
+  this.update();
+  
+  let a = accumulator || 0;
+  const pivotX = this.botR.x;
+  const pivotY = this.botR.y;
+  
+  this.botL.rotate(a, pivotX, pivotY);
+  this.topR.rotate(a, pivotX, pivotY);
+  this.topL.rotate(a, pivotX, pivotY);
+  
+  if (this.link) this.link.rotate(radians, a + radians);
+  if (this.piston) this.piston.rotate((a + radians / 2));
+}
+
+Segment.prototype.draw = function () {
+	if (drawValue > 0 && shouldColor) this.counter++;
+	
+    if (this.link) this.link.draw();
+  if (this.piston) this.piston.draw();
+  
+	if (!shouldColor ) return;
+	if (this.index == 0 && drawValue > drawIncre) return;
+  
+    strokeWeight(1.5);
+    //stroke(255, 100 * drawValue / 0.77, 255 * drawValue / 0.77, 70);
+	stroke(0, 0, 0, 70);
+	
+	//if ((this.counter - 1) % 24 == 0 || this.counter == 1) {
+	//	strokeWeight(2);
+	//	stroke(255, 255, 255, 100);
+	//}
+	
+	noFill();
+	fill(255 * 0.95, 255 * 0.95, 255 * 0.95, 50);
+    quad(this.botL.x, this.botL.y, 
+         this.botR.x, this.botR.y, 
+         this.topR.x, this.topR.y, 
+         this.topL.x, this.topL.y)
+    
+    //strokeWeight(8);
+    //stroke(0);
+    //point(this.botR.x, this.botR.y);
+    //point(this.botL.x, this.botL.y);
+    //point(this.topR.x, this.topR.y);
+    //point(this.topL.x, this.topL.y);
+ 
+}
+
+const _Point = function (x, y) {
+	this.color = color(255, 204, 0, 20);
+	this.x = x;
+	this.y = y;
+	
+	this.history = [];
+	_Point.all.push(this);
+}
+
+_Point.all = [];
+
+_Point.updateAll = function () {
+  for (let i = 0; i < _Point.all.length; i++) {
+    const p = _Point.all[i];
+	p.log();
+  } 
+}
+
+_Point.drawLogAll = function () {
+    for (let i = 0; i < _Point.all.length; i++) {
+      const p = _Point.all[i];
+	  
+	  noFill();
+	  strokeWeight(1);
+	  stroke(p.color);
+	  beginShape();
+	  
+	  for (let k = 0; k < p.history.length; k++) {
+		const pos = p.history[k];
+		vertex(pos.x, pos.y);
+	  }
+	  
+	  endShape();
+
+  } 
+}
+
+_Point.prototype.rotate = function (radians, pivotX, pivotY) {   
+	const oldX = this.x - pivotX;
+	const oldY = this.y - pivotY;
+  
+	const newX = oldX * cos(radians) - oldY * sin(radians);
+	const newY = oldY * cos(radians) + oldX * sin(radians);
+  
+	this.x = newX + pivotX;
+	this.y = newY + pivotY;
+}
+
+_Point.prototype.log = function () {
+	if (this.history.length >= 2) {
+		const last = this.history[this.history.length - 1];
+		if (this.x == last.x && this.y == last.y) return;
+	}
+   
+    this.history.push(
+      {x: this.x, 
+       y: this.y});
+    
+    if (this.history.length > 500) this.history.shift();
+}
+
+</script>
+  </head>
+  <body>
+    <main>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,309 @@
+<html>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.1.9/lib/p5.js"></script>
+    <script>
+	
+/**********************************START OF SCRIPT********************************************************************/
+
+/////////////////////////////// Variable getters
+
+function getBackgroundAlpha() {
+	//return 5
+	return backgroundTransparencySlider.value();
+}
+
+function getScale() {
+	//return 40
+	return scaleSlider.value();
+}
+
+function getXSpeed() {
+	// return -10
+	return xSpeedSlider.value();
+}
+
+function getYSpeed() {
+	// return 3
+	return ySpeedSlider.value();
+}
+
+function getOffset() {
+	//return 20
+	return offsetSlider.value();
+}
+
+
+///////////////////////////////// UI setup
+
+let offsetSlider;
+let xSpeedSlider;
+let ySpeedSlider;
+
+let backgroundTransparencySlider;
+let scaleSlider;
+
+let toggleSameSize = false;
+
+function setupUI() {
+  //graph controllers
+  //offsetSlider = createSlider(0, 200, 50, 0.1);
+  //offsetSlider.position(10, 10);
+  //offsetSlider.style('width', '800px');
+  
+  xSpeedSlider = createSlider(0, 100, 10, 0.1);
+  xSpeedSlider.position(10, 10);
+  xSpeedSlider.style('width', '800px');
+  
+  ySpeedSlider = createSlider(0, 15, 3, 0.1);
+  ySpeedSlider.position(10, 40);
+  ySpeedSlider.style('width', '800px');
+  
+  //page controllers
+  backgroundTransparencySlider = createSlider(0, 255, 5);
+  backgroundTransparencySlider.position(1000, 10);
+  backgroundTransparencySlider.style('width', '400px');
+  
+  scaleSlider = createSlider(10, 100, 50, 0.1);
+  scaleSlider.position(1000, 40);
+  scaleSlider.style('width', '400px');
+
+  button = createButton('same size');
+  button.position(20, 70);
+  button.id('toggle');
+  button.mousePressed(() => {
+	toggleSameSize = !toggleSameSize;
+	setUpBumps();
+	
+	});
+  
+  
+  /////
+  
+  scaleSlider.input(() => setUpBumps());
+
+}
+
+function drawText() {
+	textSize(20);
+	fill(255);
+	textAlign(LEFT, CENTER);
+	strokeWeight(0);
+	
+	//text('Y_OFFSET', 830, 20, width);
+	text('X_SPEED', 830, 20, width);
+	text('Y_SPEED', 830, 50, width);
+	
+	text('ALPHA', 1415, 20, width);
+	text('SCALE', 1415, 50, width);
+
+	const b = document.querySelector('#toggle');	
+	if (toggleSameSize) b.innerHTML = "change to different size"
+	else b.innerHTML = "change to same size"
+
+}
+
+
+
+////////////////////////////////
+
+let allBumps = [];
+
+function setUpBumps() {
+	allBumps = [];
+	let lastBump = null;
+	for (let i = 0; i < 10; i++) {
+	
+		const graph = createBump(lastBump);
+	
+		lastBump = graph;
+		allBumps.push(graph);
+	}
+}
+
+function setup() {
+	createCanvas(windowWidth, windowHeight);
+	
+	setupUI();
+	
+	background(0);
+	stroke(255, 255, 255, 100);
+	strokeWeight(0.8);
+	
+	setUpBumps();
+
+}
+
+function createBump(lastNode) {
+	const lastX = (lastNode == null ? 0 : lastNode.getRight().x);
+
+	function getRandInt(min, max) {
+	  return Math.floor(Math.random() * (max - min + 1) ) + min;
+	}
+
+
+	const scale = getScale();
+	
+	const tiles = toggleSameSize ? 7 : getRandInt(5, 13);
+	const tileLength = 2.8;
+	const bumpWidth = (tiles * tileLength) * scale;
+	
+	const bumpHeight = (3) * scale;
+
+	const graph = new _graph(bumpWidth, bumpHeight);
+		
+	graph.move(lastX, (height/2) + (bumpHeight/2));
+	
+	const offset = bumpHeight/4//getOffset();
+	
+	graph.height = lastNode == null? bumpHeight : lastNode.height;
+	graph.down = lastNode == null? true : lastNode.down;
+	graph.tick(offset);
+	
+	return graph;
+}
+
+function draw() {
+	
+	background(0, 0, 0, getBackgroundAlpha());
+	//background(0);
+
+	drawText();
+	strokeWeight(1);
+
+	for (let i = 0; i < allBumps.length; i++) {
+		const bump = allBumps[i];
+		
+		bump.draw();
+		
+		bump.tick(getYSpeed());
+		bump.calculate();
+		bump.move(- getXSpeed(), 0);
+		
+		if (allBumps[i].getRight().x < 0 - (allBumps[i].width * 2)) {
+			allBumps.splice(i, 1);
+			
+			const lastBump = allBumps[allBumps.length - 1];
+			allBumps.push(createBump(lastBump));
+		}
+		
+		
+	}
+
+}
+
+
+
+function genPoints(width) {
+	const number_of_points = 100;
+	const pointArray = []
+	
+	for (let i = 0; i < number_of_points; i++) {
+		pointArray.push(
+			createVector((width/(number_of_points - 1)) * i, 0)
+		);
+	}
+	
+	return pointArray;
+
+}
+	
+const _graph = function (graphWidth, graphHeight) {
+	this.width = graphWidth;
+	this.maxHeight = graphHeight;
+	this.down = true;
+	
+	this.height = graphHeight;
+	this.pointsArray = genPoints(this.width)
+	this.offsetX = 0;
+	this.offsetY = 0;
+	
+	this.calculate();
+
+}
+
+_graph.prototype.tick = function (value) {
+	if (this.down == true) {
+		if (this.height - value < 0) {
+			this.down = false;
+			
+			const difference = value - this.height;
+			this.height = 0;
+			this.height += difference;
+		}
+		else {
+			this.height -= value;
+			
+		}
+	} else if (this.down == false) {
+		if (this.height + value > this.maxHeight) {				
+			this.down = true;
+			
+			const difference = (this.height + value) - this.maxHeight;
+			this.height = this.maxHeight;
+			this.height -= difference
+		}
+		else {
+			this.height += value;
+		}
+	}
+	
+	this.calculate();
+}
+
+_graph.prototype.calculate = function () {
+	for (let i = 0; i < this.pointsArray.length; i++) {
+		const point = this.pointsArray[i];
+	
+		//generate graphed point
+		const graphX = map(point.x, 0, this.width, -PI, PI);
+		let graphY = cos(graphX);
+	
+		//offset point
+		graphY = graphY + 1;
+	
+		//scale point
+		graphY = graphY * this.height/2;
+	
+		//negative because of cartesian coordinates
+		point.y = -graphY
+		
+	}
+
+}
+
+_graph.prototype.draw = function() {
+	noFill();  
+	beginShape();
+
+	for (let i = 0; i < this.pointsArray.length; i++) {
+		const p = this.pointsArray[i]
+		curveVertex(p.x + this.offsetX, p.y + this.offsetY);
+		curveVertex(p.x + this.offsetX, p.y + this.offsetY);
+	}
+  
+	endShape();
+}
+
+_graph.prototype.move = function(x, y) {
+	this.offsetX += x;
+	this.offsetY += y;
+}
+
+_graph.prototype.getRight = function() {
+	const rightPoint = this.pointsArray[this.pointsArray.length - 1];
+	return createVector(rightPoint.x + this.offsetX, rightPoint.y + this.offsetY);
+}
+
+
+
+/**********************************END OF SCRIPT********************************************************************/
+
+</script>
+<style>
+    html,
+    body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+    }
+</style>
+</html>
