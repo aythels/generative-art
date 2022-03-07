@@ -1,0 +1,281 @@
+<html>
+  <head>
+    <style>
+        body {
+            margin: 0px;
+            padding: 0px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.4.1/lib/p5.js"></script>
+    <script>
+		const WINDOW_SIZE = 540;
+		let manager = null;
+		let done = false;
+
+		function setup() {
+			createCanvas(WINDOW_SIZE, WINDOW_SIZE);
+
+			manager = new LineModelManager();
+			//manager.create(0, 100, 'E');
+
+			////manager.create(parseInt(WINDOW_SIZE/2), parseInt(WINDOW_SIZE/2) + 1, 'S');
+			manager.create(parseInt(WINDOW_SIZE/2) + 1, parseInt(WINDOW_SIZE/2), 'E');
+			////manager.create(parseInt(WINDOW_SIZE/2), parseInt(WINDOW_SIZE/2), 'N');
+			manager.create(parseInt(WINDOW_SIZE/2), parseInt(WINDOW_SIZE/2), 'W');
+
+			//manager.create(0, parseInt(WINDOW_SIZE/2), 'E');
+		}
+		  
+		function draw() {
+			background(0);
+			manager.update();
+			manager.render();
+		}
+
+		const LineModelManager = function() {
+			
+			const rowLineModels = [];
+			const colLineModels = [];
+			
+			this.create = (x, y, dir) => {
+
+				// creation limit
+				if (done) return null;
+				if ((colLineModels.length + rowLineModels.length) > 5000) done = true;
+
+				const newLine = new LineModel(x, y, dir);
+
+				if (dir === 'N' || dir === 'S') colLineModels.push(newLine);
+				else if (dir === 'W' || dir === 'E') rowLineModels.push(newLine);
+
+				return newLine;
+			}
+
+			this.delete = (lineModel) => {
+
+				if (lineModel.dir === 'W' || lineModel.dir === 'E') {
+					const index = rowLineModels.indexOf(lineModel);
+					rowLineModels.splice(index, 1);
+				} else if (lineModel.dir === 'N' || lineModel.dir === 'S'){
+					const index = colLineModels.indexOf(lineModel);
+					colLineModels.splice(index, 1);
+				}
+			}
+
+			this.update = () => {
+				for (let i = 0; i < rowLineModels.length; i++) {
+					const line = rowLineModels[i];
+
+					// delete the line if it is stuck                   //TODO FIX THIS
+					if (line.disable && line.length === 0) { 
+						this.delete(line);
+						continue;
+					}
+
+					// don't update disabled lines
+					if (line.disable) continue;
+					
+					// disable line updating if it intersects
+					if (line.intersects(colLineModels)) {
+						line.disable = true;
+						continue;
+					}
+
+					// disable line updating if it is out of page
+					if (!this.isInPage(line)) {
+						line.disable = true;
+						continue;
+					}
+				
+					line.update();    
+				}
+
+				for (let i = 0; i < colLineModels.length; i++) {
+					const line = colLineModels[i];
+
+					// delete the line if it is stuck
+					if (line.disable && line.length === 0) {
+						this.delete(line);
+						continue;
+					}
+
+					// don't update disabled lines
+					if (line.disable) continue;
+
+					// disable line updating if it intersects
+					if (line.intersects(rowLineModels)) {
+						line.disable = true;
+						continue;
+					}
+
+					// disable line updating if it is out of page
+					if (!this.isInPage(line)) {
+						line.disable = true;
+						continue;
+					}
+				
+					line.update();    
+				}
+
+			}
+			
+			this.render = () => {
+				rowLineModels.forEach(l => l.render());
+				colLineModels.forEach(l => l.render());
+			}
+
+			this.switchRandom = (lineModel) => {
+				// TODO FIX
+
+				let choices = null;
+				if (lineModel.dir === 'N' || lineModel.dir === 'S') choices = ['W', 'E'];
+				else if (lineModel.dir === 'W' || lineModel.dir === 'E') choices = ['N', 'S'];
+
+				const newDir = choices[Math.floor(Math.random() * choices.length)];
+
+				const point = this.getInternalPoint(lineModel);
+
+				let xDiff = 0;
+				let yDiff = 0;
+				
+				if (newDir === 'N')      yDiff -= 1;
+				else if (newDir === 'S') yDiff += 1;
+				else if (newDir === 'W') xDiff -= 1;
+				else if (newDir === 'E') xDiff += 1;
+
+				// create teh new line
+				const newLine = this.create(point.x + xDiff, point.y + yDiff, newDir);
+				if (newLine) newLine.recursion = lineModel.recursion + 1;
+			}
+
+			this.getInternalPoint = (lineModel) => {
+				function getRandomIntInclusive(min, max) {
+					min = Math.ceil(min);
+					max = Math.floor(max);
+					return Math.floor(Math.random() * (max - min + 1) + min); //The maximum is inclusive and the minimum is inclusive
+				}
+
+				const endPoint = lineModel.getEndPoint();
+
+				if (lineModel.dir === 'N' || lineModel.dir === 'S') {
+					const min = Math.min(lineModel.y, endPoint.y);
+					const max = Math.max(lineModel.y, endPoint.y);
+
+					return {x: lineModel.x, y: getRandomIntInclusive(min, max)};
+				} else if (lineModel.dir === 'W' || lineModel.dir === 'E') {
+					const min = Math.min(lineModel.x, endPoint.x);
+					const max = Math.max(lineModel.x, endPoint.x);
+
+					return {x: getRandomIntInclusive(min, max), y: lineModel.y};
+				}
+
+			}
+
+			this.isInPage = (lineModel) => {
+				const endPoint = lineModel.getEndPoint();
+				if (lineModel.x >= 0 && endPoint.x <= WINDOW_SIZE && 
+					lineModel.y >= 0 && lineModel.y <= WINDOW_SIZE)
+					return true;
+
+				return false;
+			}
+		}
+
+		const LineModel = function(x, y, dir) {
+			this.x = x;
+			this.y = y;
+			this.dir = dir;
+			this.length = 0;
+
+			this.disable = false;
+
+			this.recursion = 0;
+			let maxRecursion = 4 + Math.floor(Math.random() * 2);   //removing the random means dominance in one direction
+
+			let counter = 0;
+			let maxCounter = 100;
+
+			const color = (() => {
+				var num = Math.round(0xffffff * Math.random());
+				var r = num >> 16;
+				var g = num >> 8 & 255;
+				var b = num & 255;
+				return 'rgb(' + r + ', ' + g + ', ' + b + ')';
+			  })();
+
+			this.render = () => {
+
+				// Recurse new line
+				if (this.recursion < maxRecursion) {
+					if (counter >= maxCounter) {
+						counter = 0;
+						manager.switchRandom(this);
+					}
+					counter += 1;
+				}
+
+				stroke(255);
+				strokeWeight(1);
+
+				const endPoint = this.getEndPoint();
+				line(this.x, this.y, endPoint.x, endPoint.y);
+			}
+
+			this.update = () => {
+				this.length += 1;
+			}
+
+			// UTILITY
+
+			this.intersects = (allLineModels) => {
+				// TODO CHECK IF ON TOP
+
+				const endPoint = this.getEndPoint(this.length);
+				const endPointNext = this.getEndPoint(this.length + 1);
+
+				if (this.dir === 'N' || this.dir === 'S') {
+					for (let i = 0; i < allLineModels.length; i++) {
+						const checkLine = allLineModels[i];
+						const checkLineEndPoint = checkLine.getEndPoint();
+						
+						if (endPointNext.y === checkLine.y || endPoint.y === checkLine.y) {
+
+							const min = Math.min(checkLine.x, checkLineEndPoint.x);
+							const max = Math.max(checkLine.x, checkLineEndPoint.x);
+				
+							if (this.x >= min && this.x <= max) return true;
+
+						}
+					}
+
+				} else if (this.dir === 'W' || this.dir === 'E') {
+					for (let i = 0; i < allLineModels.length; i++) {
+						const checkLine = allLineModels[i];
+						const checkLineEndPoint = checkLine.getEndPoint();
+
+						if (endPointNext.x === checkLine.x || endPoint.x === checkLine.x) {
+
+							const min = Math.min(checkLine.y, checkLineEndPoint.y);
+							const max = Math.max(checkLine.y, checkLineEndPoint.y);
+				
+							if (this.y >= min && this.y <= max) return true;
+					
+						}
+					}
+				}
+
+				return false;
+			}
+
+			this.getEndPoint = (length = this.length) => {
+				if (this.dir === 'N')      return {x: this.x, y: this.y - length};
+				else if (this.dir === 'S') return {x: this.x, y: this.y + length};
+				else if (this.dir === 'W') return {x: this.x - length, y: this.y};
+				else if (this.dir === 'E') return {x: this.x + length, y: this.y};
+			}
+		}
+    </script>
+  </head>
+  <body>
+  </body>
+</html>
